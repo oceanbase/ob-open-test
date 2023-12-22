@@ -4,19 +4,13 @@
 package util
 
 import (
-	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"time"
-
-	log "k8s.io/klog/v2"
 )
 
 func ExistsFile(path string) bool {
@@ -64,10 +58,6 @@ type OBFile struct {
 }
 
 func (obf *OBFile) CloseFile() error {
-	err := obf.File.Close()
-	if err != nil {
-		return err
-	}
 	Fdm.fdNu--
 	if Fdm.fdNu < 0 {
 		panic("painc:Fdm.fdNu<0")
@@ -120,7 +110,6 @@ func ReadFile(filePath string) (string, error) {
 		return "", err
 	}
 	//关闭文件
-	defer file.Close()
 
 	//读取文件内容
 	buf := make([]byte, 1024*2)        // 2k大小
@@ -132,7 +121,7 @@ func ReadFile(filePath string) (string, error) {
 	return string(buf), nil
 }
 
-//basePath是固定目录路径,folderName是文件夹名
+// basePath是固定目录路径,folderName是文件夹名
 func CreateDateDir(basePath string, folderName string) error {
 	folderPath := filepath.Join(basePath, folderName)
 	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
@@ -148,110 +137,4 @@ func CreateDateDir(basePath string, folderName string) error {
 		}
 	}
 	return nil
-}
-func CreateEmptyFileOnLocalPath(fileName string) error {
-	if ExistsFile(fileName) {
-		return nil
-	}
-	_, err := os.Create(fileName)
-	return err
-
-}
-
-// RenameFile rename移动文件夹
-func RenameFile(oldfile, newfile string) error {
-	err := os.Rename(oldfile, newfile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-func CopyFile(oldfile, newfile string) error {
-	return nil
-}
-
-func GetFileNames(path string, gettype string) ([]string, error) {
-	var fileNames []string
-	fileNames, err := GetAllFileNames(path)
-	if err != nil {
-		return fileNames, err
-	}
-	dirNames, err := GetAllDirNames(path)
-	if err != nil {
-		return dirNames, err
-	}
-	switch gettype {
-	case "all":
-		return append(fileNames, dirNames...), nil
-
-	case "file":
-		return fileNames, nil
-
-	case "dir":
-		return dirNames, err
-	default:
-		return nil, errors.New("gettype is err")
-	}
-	return nil, errors.New("意外错误")
-}
-func RMFile(filePath string) error {
-	return os.Remove(filePath)
-}
-func WriteFileADD(filePath, data string) error {
-	if data == "" {
-		return nil
-	}
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Warning(err)
-		return err
-	}
-	//及时关闭file句柄
-	defer file.Close()
-	//写入文件时，使用带缓存的 *Writer
-	write := bufio.NewWriter(file)
-	write.WriteString(data + "\n")
-
-	//Flush将缓存的文件真正写入到文件中
-	err = write.Flush()
-	return err
-}
-
-func SelectDataOnFileByString(path string, str string) (string, error) {
-	redata := ""
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		log.Warning(err)
-		return "", err
-	}
-	//及时关闭file句柄
-	defer file.Close()
-	filename := path
-	fileHanle, err := Fdm.OpenFile(filename)
-	if err != nil {
-		log.Warning(err)
-		return "", err
-	}
-	defer func() {
-		fileHanle.Close()
-		Fdm.fdNu--
-		runtime.GC()
-	}()
-	readBytes, err := ioutil.ReadAll(fileHanle)
-	if err != nil {
-
-		log.Warning(err)
-		return "", err
-	}
-	//拆分行为切片
-	results := strings.Split(string(readBytes), "\n")
-	for i := 0; i < len(results); i++ {
-		if strings.Contains(results[i], str) {
-			redata += results[i] + "\n"
-		}
-	}
-
-	return redata, nil
-
 }
